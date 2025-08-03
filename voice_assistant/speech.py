@@ -124,10 +124,17 @@ class TextToSpeech:
     
     def __init__(self, config: Config):
         self.config = config
-        self.engine = pyttsx3.init()
         self.speech_queue = queue.Queue()
         self.is_speaking = False
-        self._configure_engine()
+        
+        # Initialize TTS engine with error handling
+        try:
+            self.engine = pyttsx3.init()
+            self._configure_engine()
+        except Exception as e:
+            logging.error(f"Failed to initialize TTS engine: {e}")
+            # Create a dummy engine for fallback
+            self.engine = None
         
         # Start speech thread
         self.speech_thread = threading.Thread(target=self._speech_worker, daemon=True)
@@ -135,23 +142,34 @@ class TextToSpeech:
         
     def _configure_engine(self):
         """Configure the TTS engine with settings from config"""
-        # Set speech rate
-        rate = self.config.get('voice_assistant.text_to_speech.rate', 200)
-        self.engine.setProperty('rate', rate)
-        
-        # Set volume
-        volume = self.config.get('voice_assistant.text_to_speech.volume', 0.9)
-        self.engine.setProperty('volume', volume)
-        
-        # Set voice
-        voice_preference = self.config.get('voice_assistant.text_to_speech.voice', 'default')
-        voices = self.engine.getProperty('voices')
-        
-        if voice_preference == 'female' and len(voices) > 1:
-            self.engine.setProperty('voice', voices[1].id)
-        elif voice_preference == 'male' and len(voices) > 0:
-            self.engine.setProperty('voice', voices[0].id)
-        # 'default' uses system default
+        try:
+            # Set speech rate
+            rate = self.config.get('voice_assistant.text_to_speech.rate', 200)
+            self.engine.setProperty('rate', rate)
+            
+            # Set volume
+            volume = self.config.get('voice_assistant.text_to_speech.volume', 0.9)
+            self.engine.setProperty('volume', volume)
+            
+            # Set voice
+            voice_preference = self.config.get('voice_assistant.text_to_speech.voice', 'default')
+            voices = self.engine.getProperty('voices')
+            
+            if voices and len(voices) > 0:
+                if voice_preference == 'female' and len(voices) > 1:
+                    try:
+                        self.engine.setProperty('voice', voices[1].id)
+                    except:
+                        # Fallback to first available voice
+                        self.engine.setProperty('voice', voices[0].id)
+                elif voice_preference == 'male' and len(voices) > 0:
+                    try:
+                        self.engine.setProperty('voice', voices[0].id)
+                    except:
+                        pass  # Use default
+                # 'default' uses system default
+        except Exception as e:
+            logging.warning(f"TTS configuration warning: {e}. Using default settings.")
         
     def speak(self, text: str, priority: bool = False):
         """Add text to speech queue"""
@@ -168,8 +186,11 @@ class TextToSpeech:
     def speak_immediately(self, text: str):
         """Speak text immediately, interrupting current speech"""
         self.stop_speaking()
-        self.engine.say(text)
-        self.engine.runAndWait()
+        if self.engine:
+            self.engine.say(text)
+            self.engine.runAndWait()
+        else:
+            print(f"🔊 TTS: {text}")
         
     def _speech_worker(self):
         """Worker thread for processing speech queue"""
@@ -178,8 +199,12 @@ class TextToSpeech:
                 text = self.speech_queue.get(timeout=1)
                 if text:
                     self.is_speaking = True
-                    self.engine.say(text)
-                    self.engine.runAndWait()
+                    if self.engine:
+                        self.engine.say(text)
+                        self.engine.runAndWait()
+                    else:
+                        # Fallback: print to console if TTS engine failed
+                        print(f"🔊 TTS: {text}")
                     self.is_speaking = False
                     self.speech_queue.task_done()
             except queue.Empty:
@@ -200,9 +225,15 @@ class TextToSpeech:
         
     def get_available_voices(self) -> list:
         """Get list of available voices"""
-        voices = self.engine.getProperty('voices')
-        return [{'id': voice.id, 'name': voice.name, 'gender': getattr(voice, 'gender', 'unknown')} 
-                for voice in voices] if voices else []
+        if not self.engine:
+            return []
+        try:
+            voices = self.engine.getProperty('voices')
+            return [{'id': voice.id, 'name': voice.name, 'gender': getattr(voice, 'gender', 'unknown')} 
+                    for voice in voices] if voices else []
+        except Exception as e:
+            logging.error(f"Error getting voices: {e}")
+            return []
                 
     def set_voice(self, voice_id: str):
         """Set voice by ID"""
