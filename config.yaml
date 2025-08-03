@@ -1,0 +1,54 @@
+# Voice Assistant Configuration
+voice_assistant:
+  # Basic Settings
+  name: "Aria"
+  wake_word: "hey aria"
+  language: "en-US"
+  
+  # Speech Recognition Settings
+  speech_recognition:
+    engine: "google"  # Options: google, sphinx, wit, bing
+    timeout: 5
+    phrase_time_limit: 10
+    energy_threshold: 300
+    dynamic_energy_threshold: true
+    
+  # Text-to-Speech Settings
+  text_to_speech:
+    engine: "pyttsx3"
+    voice: "default"  # Options: default, male, female
+    rate: 200
+    volume: 0.9
+    
+  # Features Configuration
+  features:
+    basic_commands: true
+    web_search: true
+    weather: true
+    email: true
+    reminders: true
+    smart_home: false
+    advanced_nlp: true
+    
+  # API Keys (set these in .env file)
+  api_keys:
+    openweather: ""
+    openai: ""
+    wolfram_alpha: ""
+    gmail_app_password: ""
+    
+  # Smart Home Integration
+  smart_home:
+    enabled: false
+    devices: []
+    
+  # Custom Commands
+  custom_commands:
+    enabled: true
+    commands: {}
+    
+  # Privacy Settings
+  privacy:
+    save_conversations: false
+    log_commands: true
+    encrypt_data: true
